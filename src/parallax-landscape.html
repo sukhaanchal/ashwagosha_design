@@ -48,6 +48,7 @@
     top: 0;
     left: 0;
     will-change: transform;
+    transform-origin: 0 0;
   }
   #bg { z-index: 1; }
   #mg { z-index: 2; }
@@ -68,6 +69,19 @@
     letter-spacing: 0.02em;
   }
   .hint.faded { opacity: 0; }
+  .zoom-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-family: 'Caveat', 'Segoe Print', cursive;
+    font-size: 18px;
+    color: var(--ink-wash);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .zoom-badge.on { opacity: 1; }
   #viewport::after {
     content: '';
     position: absolute;
@@ -82,28 +96,43 @@
   <canvas id="bg"></canvas>
   <canvas id="mg"></canvas>
   <canvas id="fg"></canvas>
-  <div class="hint" id="hint">&#8592; drag to explore &#8594;</div>
+  <div class="hint" id="hint">drag to pan &#183; scroll to zoom</div>
+  <div class="zoom-badge" id="zbadge"></div>
 </div>
 
 <script>
 (function () {
   'use strict';
 
-  var SPEED = { bg: 0.1, mg: 0.35, fg: 1.0 };
+  /* ── config ── */
+  var SX = { bg: 0.1, mg: 0.35, fg: 1.0 };
+  var SY = { bg: 0.05, mg: 0.2, fg: 0.6 };
+  var ZR = { bg: 0.3, mg: 0.6, fg: 1.0 };
   var WORLD = 3.2;
   var FRICTION = 0.93;
   var LERP = 0.12;
+  var MINZ = 0.7, MAXZ = 3.0;
 
+  /* ── elements ── */
   var bgC = document.getElementById('bg');
   var mgC = document.getElementById('mg');
   var fgC = document.getElementById('fg');
   var hint = document.getElementById('hint');
+  var zbadge = document.getElementById('zbadge');
   var vp = document.getElementById('viewport');
+  var canvases = { bg: bgC, mg: mgC, fg: fgC };
 
-  var vpW, vpH, maxPan;
-  var pan = 0, target = 0, vel = 0;
-  var dragging = false, lastX = 0, lastT = 0;
+  /* ── state ── */
+  var vpW, vpH, maxPanX;
+  var panX = 0, panY = 0, zoom = 1;
+  var tgtX = 0, tgtY = 0, tgtZ = 1;
+  var velX = 0, velY = 0;
+  var dragging = false, pinching = false;
+  var lastX = 0, lastY = 0, lastT = 0;
   var hintShown = true;
+  var ptrs = new Map();
+  var pinchDist = 0, pinchMid = { x: 0, y: 0 };
+  var zoomFadeTimer = 0;
 
   /* ── seeded PRNG ── */
   var _s = 0;
@@ -515,60 +544,179 @@
   function build() {
     vpW = window.innerWidth;
     vpH = window.innerHeight;
-    maxPan = vpW * (WORLD - 1);
+    maxPanX = vpW * (WORLD - 1);
     var c = getColors();
-    var bgW = Math.ceil(vpW + maxPan * SPEED.bg);
-    var mgW = Math.ceil(vpW + maxPan * SPEED.mg);
-    var fgW = Math.ceil(vpW + maxPan * SPEED.fg);
+    var bgW = Math.ceil(vpW + maxPanX * SX.bg);
+    var mgW = Math.ceil(vpW + maxPanX * SX.mg);
+    var fgW = Math.ceil(vpW + maxPanX * SX.fg);
     renderBG(setupCanvas(bgC, bgW, vpH), bgW, vpH, c);
     renderMG(setupCanvas(mgC, mgW, vpH), mgW, vpH, c);
     renderFG(setupCanvas(fgC, fgW, vpH), fgW, vpH, c);
   }
 
+  /* ── transforms ── */
   function applyTransforms() {
-    bgC.style.transform = 'translate3d(' + (-pan * SPEED.bg) + 'px,0,0)';
-    mgC.style.transform = 'translate3d(' + (-pan * SPEED.mg) + 'px,0,0)';
-    fgC.style.transform = 'translate3d(' + (-pan * SPEED.fg) + 'px,0,0)';
+    var ids = ['bg', 'mg', 'fg'];
+    for (var k = 0; k < ids.length; k++) {
+      var id = ids[k];
+      var s = 1 + (zoom - 1) * ZR[id];
+      var tx = vpW / 2 * (1 - s) - s * panX * SX[id];
+      var ty = vpH / 2 * (1 - s) - s * panY * SY[id];
+      canvases[id].style.transform =
+        'translate3d(' + tx + 'px,' + ty + 'px,0) scale(' + s + ')';
+    }
   }
 
-  /* ── interaction ── */
-  function onDown(e) {
-    dragging = true;
-    lastX = e.clientX != null ? e.clientX : 0;
-    lastT = performance.now();
-    vel = 0;
-    document.body.classList.add('dragging');
+  /* ── clamping ── */
+  function clampState() {
+    var fgZ = 1 + (tgtZ - 1) * ZR.fg;
+    var mxX = vpW * (WORLD - 1 / fgZ);
+    tgtX = Math.max(0, Math.min(mxX, tgtX));
+    var mxY = vpH * 0.35;
+    tgtY = Math.max(-mxY, Math.min(mxY, tgtY));
+    tgtZ = Math.max(MINZ, Math.min(MAXZ, tgtZ));
+  }
+
+  /* ── helpers ── */
+  function hideHint() {
     if (hintShown) { hint.classList.add('faded'); hintShown = false; }
-    if (e.pointerId != null) vp.setPointerCapture(e.pointerId);
   }
-  function onMove(e) {
-    if (!dragging) return;
-    var x = e.clientX != null ? e.clientX : 0;
-    var dx = lastX - x;
-    var now = performance.now(), dt = now - lastT;
-    if (dt > 0) vel = dx / dt * 16;
-    target = Math.max(0, Math.min(maxPan, target + dx));
-    lastX = x; lastT = now;
-  }
-  function onUp() {
-    dragging = false;
-    document.body.classList.remove('dragging');
+  function showZoom() {
+    zbadge.textContent = zoom.toFixed(1) + '×';
+    zbadge.classList.add('on');
+    clearTimeout(zoomFadeTimer);
+    zoomFadeTimer = setTimeout(function () { zbadge.classList.remove('on'); }, 1200);
   }
 
-  vp.addEventListener('pointerdown', function (e) { e.preventDefault(); onDown(e); });
+  /* ── pointer interaction (drag + pinch) ── */
+  function onDown(e) {
+    e.preventDefault();
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    vp.setPointerCapture(e.pointerId);
+
+    if (ptrs.size === 1) {
+      dragging = true;
+      lastX = e.clientX; lastY = e.clientY;
+      lastT = performance.now();
+      velX = 0; velY = 0;
+      document.body.classList.add('dragging');
+    } else if (ptrs.size >= 2) {
+      dragging = false; pinching = true;
+      var arr = Array.from(ptrs.values());
+      pinchDist = Math.hypot(arr[1].x - arr[0].x, arr[1].y - arr[0].y) || 1;
+      pinchMid = { x: (arr[0].x + arr[1].x) / 2, y: (arr[0].y + arr[1].y) / 2 };
+    }
+    hideHint();
+  }
+
+  function onMove(e) {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinching && ptrs.size >= 2) {
+      var arr = Array.from(ptrs.values());
+      var dist = Math.hypot(arr[1].x - arr[0].x, arr[1].y - arr[0].y) || 1;
+      var mid = { x: (arr[0].x + arr[1].x) / 2, y: (arr[0].y + arr[1].y) / 2 };
+
+      var fgZ = 1 + (tgtZ - 1) * ZR.fg;
+      tgtX += (pinchMid.x - mid.x) / (fgZ * SX.fg);
+      tgtY += (pinchMid.y - mid.y) / (fgZ * SY.fg);
+
+      var oldZ = tgtZ;
+      tgtZ = Math.max(MINZ, Math.min(MAXZ, tgtZ * (dist / pinchDist)));
+      tgtX += (mid.x - vpW / 2) * (1 / oldZ - 1 / tgtZ) / SX.fg;
+      tgtY += (mid.y - vpH / 2) * (1 / oldZ - 1 / tgtZ) / SY.fg;
+
+      clampState();
+      pinchDist = dist;
+      pinchMid = mid;
+      showZoom();
+      return;
+    }
+
+    if (dragging && ptrs.size === 1) {
+      var x = e.clientX, y = e.clientY;
+      var dx = lastX - x, dy = lastY - y;
+      var now = performance.now(), dt = now - lastT;
+      var fgZ = 1 + (tgtZ - 1) * ZR.fg;
+      if (dt > 0) {
+        velX = (dx / (fgZ * SX.fg)) / dt * 16;
+        velY = (dy / (fgZ * SY.fg)) / dt * 16;
+      }
+      tgtX += dx / (fgZ * SX.fg);
+      tgtY += dy / (fgZ * SY.fg);
+      clampState();
+      lastX = x; lastY = y; lastT = now;
+    }
+  }
+
+  function onUp(e) {
+    ptrs.delete(e.pointerId);
+    if (ptrs.size < 2) pinching = false;
+    if (ptrs.size === 0) {
+      dragging = false;
+      document.body.classList.remove('dragging');
+    } else if (ptrs.size === 1 && !pinching) {
+      dragging = true;
+      var p = Array.from(ptrs.values())[0];
+      lastX = p.x; lastY = p.y;
+      lastT = performance.now();
+      velX = 0; velY = 0;
+    }
+  }
+
+  /* ── wheel zoom ── */
+  function onWheel(e) {
+    e.preventDefault();
+    var factor = e.deltaY > 0 ? 0.94 : 1.06;
+    var oldZ = tgtZ;
+    tgtZ = Math.max(MINZ, Math.min(MAXZ, tgtZ * factor));
+    tgtX += (e.clientX - vpW / 2) * (1 / oldZ - 1 / tgtZ) / SX.fg;
+    tgtY += (e.clientY - vpH / 2) * (1 / oldZ - 1 / tgtZ) / SY.fg;
+    clampState();
+    hideHint();
+    showZoom();
+  }
+
+  /* ── keyboard ── */
+  function onKey(e) {
+    var step = 40 / tgtZ;
+    var fgZ = 1 + (tgtZ - 1) * ZR.fg;
+    var handled = true;
+    switch (e.key) {
+      case 'ArrowLeft':  tgtX -= step / SX.fg; break;
+      case 'ArrowRight': tgtX += step / SX.fg; break;
+      case 'ArrowUp':    tgtY -= step / SY.fg; break;
+      case 'ArrowDown':  tgtY += step / SY.fg; break;
+      case '+': case '=':
+        var oldZ = tgtZ; tgtZ = Math.min(MAXZ, tgtZ * 1.15); showZoom(); break;
+      case '-': case '_':
+        var oldZ = tgtZ; tgtZ = Math.max(MINZ, tgtZ * 0.87); showZoom(); break;
+      default: handled = false;
+    }
+    if (handled) { e.preventDefault(); clampState(); hideHint(); }
+  }
+
+  /* ── event listeners ── */
+  vp.addEventListener('pointerdown', onDown);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
+  vp.addEventListener('wheel', onWheel, { passive: false });
+  window.addEventListener('keydown', onKey);
 
   /* ── animation loop ── */
   function tick() {
-    if (!dragging) {
-      target += vel;
-      vel *= FRICTION;
-      if (Math.abs(vel) < 0.05) vel = 0;
-      target = Math.max(0, Math.min(maxPan, target));
+    if (!dragging && !pinching) {
+      tgtX += velX; tgtY += velY;
+      velX *= FRICTION; velY *= FRICTION;
+      if (Math.abs(velX) < 0.05) velX = 0;
+      if (Math.abs(velY) < 0.05) velY = 0;
+      clampState();
     }
-    pan += (target - pan) * LERP;
+    panX += (tgtX - panX) * LERP;
+    panY += (tgtY - panY) * LERP;
+    zoom += (tgtZ - zoom) * LERP;
     applyTransforms();
     requestAnimationFrame(tick);
   }
@@ -578,9 +726,13 @@
   window.addEventListener('resize', function () {
     clearTimeout(rTimer);
     rTimer = setTimeout(function () {
-      var ratio = maxPan > 0 ? pan / maxPan : 0;
+      var rx = maxPanX > 0 ? panX / maxPanX : 0;
+      var ry = panY, rz = zoom;
       build();
-      target = pan = ratio * maxPan;
+      tgtX = panX = rx * maxPanX;
+      tgtY = panY = ry;
+      tgtZ = zoom = rz;
+      clampState();
       applyTransforms();
     }, 200);
   });
@@ -590,8 +742,8 @@
 
   /* ── init ── */
   build();
-  target = maxPan * 0.25;
-  pan = target;
+  tgtX = maxPanX * 0.25;
+  panX = tgtX;
   applyTransforms();
   requestAnimationFrame(tick);
 })();
