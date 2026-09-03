@@ -8,8 +8,12 @@ export const COLORS = {
   borderLight: '#ececef',
   cardBg: '#ffffff',
   pageBg: '#e9eaec',
+  homeBg: '#fafafa',
   fullBg: '#f4f4f6',
   chipBg: '#f4f4f6',
+  pillBg: '#f2f2f4',
+  warmBg: '#f6f2ea',
+  warmBorder: '#e8e1d3',
   devanagari: '#c8c8ce',
   white: '#ffffff',
   black: '#000000',
@@ -18,9 +22,15 @@ export const COLORS = {
   selectedDay: '#111111',
   tabInactive: '#8a8a8a',
   tabActive: '#303030',
+  textPrimary: '#303030',
+  textSecondary: '#8a8a8a',
+  textBody: '#3a3a3a',
+  buttonDark: '#303030',
+  buttonLight: '#f5f5f7',
   green: '#34c759',
   avoidBg: '#faf6f4',
   shadow: 'rgba(0,0,0,0.08)',
+  starColor: '#e8a838',
 };
 
 export const FONTS = {

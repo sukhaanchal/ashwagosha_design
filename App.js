@@ -13,8 +13,21 @@ import {
   IBMPlexMono_500Medium,
   IBMPlexMono_600SemiBold,
 } from '@expo-google-fonts/ibm-plex-mono';
-import { AppProvider } from './src/utils/AppContext';
+import { AppProvider, useApp } from './src/utils/AppContext';
+import HomeScreen from './src/screens/HomeScreen';
 import CalendarScreen from './src/screens/CalendarScreen';
+import HoroscopeDetailScreen from './src/screens/HoroscopeDetailScreen';
+
+function MainContent() {
+  const { state } = useApp();
+
+  return (
+    <>
+      {state.active === 'home' ? <HomeScreen /> : <CalendarScreen />}
+      <HoroscopeDetailScreen />
+    </>
+  );
+}
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -38,7 +51,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <CalendarScreen />
+        <MainContent />
       </AppProvider>
     </SafeAreaProvider>
   );

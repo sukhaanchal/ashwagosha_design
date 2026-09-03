@@ -3,7 +3,7 @@ import React, { createContext, useContext, useReducer } from 'react';
 const AppContext = createContext();
 
 const initialState = {
-  active: 'calendar',
+  active: 'home',
   dayOffset: 0,
   monthOffset: 0,
   sheetExpanded: false,
@@ -14,6 +14,11 @@ const initialState = {
   locOpen: false,
   addMenuOpen: false,
   events: {},
+  homeSignIdx: 0,
+  showFullHoroscope: false,
+  fullHoroscopeIdx: 0,
+  showPersonalize: false,
+  profiles: [{ id: 'self', name: 'You', signIdx: 1 }],
   prefsSelected: ['Career', 'Love', 'Wellness', 'Spirituality'],
   prefsSuggested: ['Money', 'Family', 'Dreams', 'Meditation', 'Astro literacy', 'Rituals'],
   dobDay: 15,

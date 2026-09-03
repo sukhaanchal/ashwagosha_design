@@ -166,3 +166,27 @@ export function EventIcon({ type = 'spark', size = 16, color = '#1a1a1a' }) {
     </Svg>
   );
 }
+
+export function ArrowUpRightIcon({ size = 14, color = '#303030' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M7 17L17 7M17 7H7M17 7v10" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function StarIcon({ size = 12, color = '#e8a838' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d="M12 2l2.4 6.4L21 9l-5 4.6L17.5 21 12 17.3 6.5 21 8 13.6 3 9l6.6-.6L12 2z" />
+    </Svg>
+  );
+}
+
+export function PromptIcon({ d, size = 16, color = '#303030' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d={d} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
