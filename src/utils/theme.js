@@ -1,63 +1,42 @@
+import {
+  COLORS as DS_COLORS,
+  FONTS as DS_FONTS,
+  SPACING as DS_SPACING,
+  RADIUS as DS_RADIUS,
+} from '../design-system/tokens';
+
 export const COLORS = {
-  primary: '#1a1a1a',
-  accent: '#8a3a1a',
-  muted: '#9a9a9a',
-  subtle: '#7a7a7a',
-  light: '#3a3a3a',
-  border: '#e4e4e8',
-  borderLight: '#ececef',
-  cardBg: '#ffffff',
-  pageBg: '#e9eaec',
-  homeBg: '#fafafa',
-  fullBg: '#f4f4f6',
-  chipBg: '#f4f4f6',
-  pillBg: '#f2f2f4',
-  warmBg: '#f6f2ea',
-  warmBorder: '#e8e1d3',
-  devanagari: '#c8c8ce',
-  white: '#ffffff',
-  black: '#000000',
-  transparent: 'transparent',
-  dot: '#8a3a1a',
-  selectedDay: '#111111',
-  tabInactive: '#8a8a8a',
-  tabActive: '#303030',
-  textPrimary: '#303030',
-  textSecondary: '#8a8a8a',
-  textBody: '#3a3a3a',
-  buttonDark: '#303030',
-  buttonLight: '#f5f5f7',
-  green: '#34c759',
-  avoidBg: '#faf6f4',
-  shadow: 'rgba(0,0,0,0.08)',
-  starColor: '#e8a838',
+  ...DS_COLORS,
+  // Legacy aliases for existing components
+  muted: DS_COLORS.textMuted,
+  subtle: DS_COLORS.textSubtle,
+  light: DS_COLORS.textBody,
+  borderLight: DS_COLORS.borderLight,
+  cardBg: DS_COLORS.bgCard,
+  pageBg: DS_COLORS.bgPage,
+  homeBg: DS_COLORS.bgHome,
+  fullBg: DS_COLORS.bgFull,
+  chipBg: DS_COLORS.bgChip,
+  pillBg: DS_COLORS.bgPill,
+  warmBg: DS_COLORS.bgWarm,
+  warmBorder: DS_COLORS.borderWarm,
+  devanagari: DS_COLORS.textDevanagari,
+  avoidBg: DS_COLORS.bgAvoid,
+  starColor: DS_COLORS.star,
 };
 
-export const FONTS = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semiBold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
-  mono: 'IBMPlexMono_400Regular',
-  monoMedium: 'IBMPlexMono_500Medium',
-  monoSemiBold: 'IBMPlexMono_600SemiBold',
-};
+export const FONTS = DS_FONTS;
 
 export const SPACING = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
+  ...DS_SPACING,
+  // Legacy values for existing components
   xl: 18,
   xxl: 22,
   xxxl: 24,
 };
 
 export const RADIUS = {
-  sm: 8,
-  md: 14,
-  lg: 18,
-  xl: 22,
-  pill: 999,
+  ...DS_RADIUS,
+  // Legacy values for existing components
   circle: 50,
 };
